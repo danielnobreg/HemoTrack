@@ -10,7 +10,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-Copy app files
+COPY app files
 COPY . .
 
 #Install PHP dependencies
