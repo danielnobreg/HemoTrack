@@ -36,7 +36,9 @@ WORKDIR /var/www
 # Copiar apenas composer.json e composer.lock para instalar dependências primeiro (cache)
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
-
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN php artisan key:generate
+RUN php artisan migrate --force
 
 # Copiar o restante do projeto
 COPY . .
