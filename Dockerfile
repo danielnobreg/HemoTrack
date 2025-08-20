@@ -35,7 +35,8 @@ WORKDIR /var/www
 
 # Copiar apenas composer.json e composer.lock para instalar dependências primeiro (cache)
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
+
 
 # Copiar o restante do projeto
 COPY . .
@@ -43,6 +44,8 @@ COPY . .
 # Ajustar permissões
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 775 storage bootstrap/cache
+
+    
 
 # Copiar configuração do Nginx
 COPY ./docker/nginx.conf /etc/nginx/sites-available/default
