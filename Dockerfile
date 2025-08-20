@@ -1,62 +1,43 @@
-# Stage 1: PHP-FPM com dependências Laravel
-FROM php:8.2-fpm AS php
+# Usa PHP com Apache
+FROM php:8.2-apache
 
-# Instalar libs do sistema e extensões PHP
+# Define diretório de trabalho
+WORKDIR /var/www/html
+
+# Instala dependências do sistema
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     unzip \
-    zip \
     libzip-dev \
-    zlib1g-dev \
-    libonig-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libicu-dev \
-    nginx \
-    supervisor \
-    && docker-php-ext-configure zip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-        mbstring \
-        zip \
-        pdo_mysql \
-        bcmath \
-        intl \
-        gd \
-    && rm -rf /var/lib/apt/lists/*
+    zip \
+    && docker-php-ext-install pdo pdo_mysql zip \
+    && a2enmod rewrite
 
-# Instalar Composer
+# Instala Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Criar diretório da aplicação
-WORKDIR /var/www
-
-# Copiar apenas composer.json e composer.lock para instalar dependências primeiro (cache)
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-RUN php artisan key:generate
-RUN php artisan migrate --force
-
-# Copiar o restante do projeto
+# Copia os arquivos do Laravel
 COPY . .
 
-# Ajustar permissões
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 775 storage bootstrap/cache
+# Instala dependências do Laravel
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-    
+# Dá permissão para storage e bootstrap
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copiar configuração do Nginx
-COPY ./docker/nginx.conf /etc/nginx/sites-available/default
+# Define variável de ambiente (Laravel roda em prod)
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+ENV APP_ENV=production
+ENV APP_DEBUG=false
 
-# Configuração do Supervisor para rodar Nginx + PHP-FPM juntos
-COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Ajusta o Apache para rodar do public/
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# Expor porta HTTP
-EXPOSE 80
+# Porta usada pelo Render
+EXPOSE 8080
 
-# Rodar supervisor (que gerencia Nginx + PHP-FPM)
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Render precisa do Apache rodando na porta 8080
+CMD ["apache2-foreground"]
